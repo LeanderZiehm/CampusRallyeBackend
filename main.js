@@ -19,10 +19,10 @@ app.get('/', async (req, res) => {
   try {
     await client.connect();
 
-    const db = client.db('campusRallye'); // Replace with your DB name
-    const collection = db.collection('data'); // Replace with your collection name
+    const db = client.db('campusRallye'); 
+    const collection = db.collection('data'); 
 
-    const data = await collection.findOne(); // Retrieve data from MongoDB
+    const data = await collection.findOne(); 
     if (data) {
       res.json(data);
     } else {
@@ -35,6 +35,42 @@ app.get('/', async (req, res) => {
     await client.close();
   }
 });
+
+
+app.post('/update', async (req, res) => {
+  try {
+    const { _id, updatedFields } = req.body;
+
+    if (!_id || !updatedFields) {
+      return res.status(400).json({ error: 'Invalid request payload' });
+    }
+
+    await client.connect();
+    const db = client.db('campusRallye'); 
+    const collection = db.collection('data');
+
+    const result = await collection.updateOne(
+      { _id },
+      { $set: updatedFields }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.json({ message: 'Data updated successfully' });
+    } else {
+      res.status(404).json({ message: 'Data not found or no changes made' });
+    }
+  } catch (error) {
+    console.error('Error updating data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await client.close();
+  }
+});
+
+
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
