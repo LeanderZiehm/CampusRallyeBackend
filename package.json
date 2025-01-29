@@ -1,18 +1,16 @@
 {
   "name": "campusrallyebackend",
   "version": "1.0.0",
-  "description": "mongodb",
+  "description": "",
   "main": "main.js",
   "scripts": {
     "start": "node main.js"
   },
-  "type": "module",
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "mongodb": "^6.12.0"
+    "express": "^4.21.2"
   }
 }

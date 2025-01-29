@@ -1,77 +1,101 @@
-import express from 'express';
-import { MongoClient } from 'mongodb';
-import { config } from 'dotenv';
-import cors from 'cors'; // Import cors
+const express = require("express");
+const https = require("https");
+const dotenv = require("dotenv");
+const cors = require('cors');
 
-config(); // Load environment variables from .env
+
+dotenv.config();
 
 const app = express();
+app.use(cors());
+
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // Add this line
+const sheetIdDE = process.env.SHEET_ID_DE;
+const sheetIdEN = process.env.SHEET_ID_EN;
+
+const getSheetUrl = (language) => {
+    const sheetId = language === "de" ? sheetIdDE : sheetIdEN;
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+};
+
+const fetchSheetData = (url) => {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let csvData = "";
+
+            res.on("data", (chunk) => {
+                csvData += chunk;
+            });
+
+            res.on("end", () => {
+                resolve(csvToJson(csvData));
+            });
+        }).on("error", (err) => {
+            reject("Error fetching Google Sheets: " + err.message);
+        });
+    });
+};
+
+function csvToJson(data) {
+    const lines = data.split("\n").map(line => line.trim()).filter(line => line);
+    const jsonData = { questions: [] };
+
+    lines.slice(1).forEach(line => {
+        const parts = line.split(/,(.+)/);
+        if (parts.length < 2) return;
+
+        const key = parts[0].replace('"', '').replace('"', '');
+        let value = parts[1].trim().replace(/^"|"$/g, "").replace(/""/g, '"');
+
+        if (key.startsWith("question_")) {
+            const parts = key.split("_");
+            const index = parseInt(parts[1], 10);
+            const field = parts.slice(2).join("_");
+
+            if (!jsonData.questions[index]) {
+                jsonData.questions[index] = {};
+            }
+            jsonData.questions[index][field] = value;
+        } else {
+            jsonData[key] = value;
+        }
+    });
+
+    return jsonData;
+}
 
 
-// MongoDB setup
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@campusrallye.mx6ej.mongodb.net/?retryWrites=true&w=majority`;
-const client = new MongoClient(uri);
-
-app.get('/', async (req, res) => {
-  try {
-    await client.connect();
-
-    const db = client.db('campusRallye'); 
-    const collection = db.collection('data'); 
-
-    const data = await collection.findOne(); 
-    if (data) {
-      res.json(data);
-    } else {
-      res.status(404).json({ message: 'Data not found' });
+app.get("/", async (req, res) => {
+    try {
+        const data = await fetchSheetData(getSheetUrl("de"));
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error });
     }
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    await client.close();
-  }
 });
 
 
-app.post('/update', async (req, res) => {
-  try {
-    const { _id, updatedFields } = req.body;
-
-    if (!_id || !updatedFields) {
-      return res.status(400).json({ error: 'Invalid request payload' });
+// German Sheet Endpoint
+app.get("/de", async (req, res) => {
+    try {
+        const data = await fetchSheetData(getSheetUrl("de"));
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error });
     }
-
-    await client.connect();
-    const db = client.db('campusRallye'); 
-    const collection = db.collection('data');
-
-    const result = await collection.updateOne(
-      { _id },
-      { $set: updatedFields }
-    );
-
-    if (result.modifiedCount > 0) {
-      res.json({ message: 'Data updated successfully' });
-    } else {
-      res.status(404).json({ message: 'Data not found or no changes made' });
-    }
-  } catch (error) {
-    console.error('Error updating data:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    await client.close();
-  }
 });
 
-
-
-
-
+// English Sheet Endpoint
+app.get("/en", async (req, res) => {
+    try {
+        const data = await fetchSheetData(getSheetUrl("en"));
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error });
+    }
+});
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
