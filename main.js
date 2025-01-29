@@ -41,7 +41,7 @@ function csvToJson(data) {
     const lines = data.split("\n").map(line => line.trim()).filter(line => line);
     const jsonData = { questions: [] };
 
-    lines.slice(1).forEach(line => {
+    lines.forEach(line => {
         const parts = line.split(/,(.+)/);
         if (parts.length < 2) return;
 
